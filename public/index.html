@@ -198,16 +198,18 @@
                     body: formData,
                 });
 
-                // PERBAIKAN: Penanganan error yang lebih baik
                 if (!response.ok) {
-                    let errorMsg = `Gagal membuat PDF. Status: ${response.status}`;
+                    // PERBAIKAN: Baca body sebagai teks SEKALI saja.
+                    const errorText = await response.text();
+                    let errorMsg;
                     try {
-                        // Coba parse error sebagai JSON
-                        const errorData = await response.json();
-                        errorMsg = errorData.message || JSON.stringify(errorData);
-                    } catch (jsonError) {
-                        // Jika gagal, baca sebagai teks biasa (mungkin halaman error HTML)
-                        errorMsg = await response.text();
+                        // Coba parse teks tersebut sebagai JSON
+                        const errorData = JSON.parse(errorText);
+                        // Ambil pesan error dari JSON, atau gunakan teks mentah jika tidak ada
+                        errorMsg = errorData.message || errorText;
+                    } catch (parseError) {
+                        // Jika gagal di-parse, berarti itu bukan JSON (mungkin HTML error dari server). Gunakan teks mentahnya.
+                        errorMsg = errorText;
                     }
                     throw new Error(errorMsg);
                 }
