@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dokumentasi Wawancara (Server-Side)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #e2e8f0; min-height: 100vh; font-size: 16px; line-height: 1.5; -webkit-tap-highlight-color: transparent; }
+        .container { max-width: 600px; margin: 0 auto; padding: 1rem; min-height: 100vh; }
+        .header { text-align: center; margin-bottom: 2rem; }
+        .header h1 { font-size: 1.75rem; font-weight: 700; color: #f1f5f9; margin-bottom: 0.5rem; }
+        .header p { font-size: 0.875rem; color: #94a3b8; }
+        .card { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3); }
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { display: block; font-size: 0.875rem; font-weight: 500; color: #cbd5e1; margin-bottom: 0.5rem; }
+        .form-input { width: 100%; padding: 0.875rem; font-size: 16px; background: #334155; border: 2px solid #475569; border-radius: 0.5rem; color: #f1f5f9; transition: all 0.2s ease; -webkit-appearance: none; appearance: none; }
+        .form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        select.form-input { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23cbd5e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.75rem center; background-repeat: no-repeat; background-size: 1.25em 1.25em; padding-right: 3rem; }
+        .btn { width: 100%; padding: 1rem; font-size: 16px; font-weight: 600; border: none; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 48px; touch-action: manipulation; }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #475569; color: #cbd5e1; margin-bottom: 1rem; }
+        .responden-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #475569; border-radius: 0.75rem; padding: 1rem; margin-bottom: 1rem; }
+        .responden-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .responden-title { font-size: 1rem; font-weight: 600; color: #f1f5f9; }
+        .remove-btn { background: #dc2626; color: white; border: none; border-radius: 0.375rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; cursor: pointer; }
+        .file-upload label { font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem; display: block; }
+        .file-input-wrapper { position: relative; background: #374151; border: 2px dashed #6b7280; border-radius: 0.5rem; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.2s ease; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+        .file-input-wrapper.has-file { border-style: solid; border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .file-input-wrapper input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .file-info { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+        .file-name { font-size: 0.75rem; color: #94a3b8; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .loading-overlay.show { display: flex; }
+        .loading-content { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 2rem; text-align: center; max-width: 300px; width: 90%; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #475569; border-top: 3px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error-message { background: rgba(239, 68, 68, 0.1); border: 1px solid #dc2626; border-radius: 0.5rem; padding: 0.75rem; margin-top: 1rem; color: #fca5a5; font-size: 0.875rem; text-align: center; display: none; }
+        .error-message.show { display: block; }
+    </style>
+</head>
+<body>
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p id="loading-text">Mengirim data...</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <header class="header">
+            <h1>Dokumentasi Wawancara</h1>
+            <p>Oleh PT Indekstat Konsultan Indonesia</p>
+        </header>
+
+        <main class="card">
+            <form id="wawancara-form">
+                <div class="form-group">
+                    <label for="nama-enumerator">Nama Enumerator / Surveyor</label>
+                    <select id="nama-enumerator" name="enumerator" class="form-input" required>
+                        <option value="" disabled selected>Pilih nama dan NIK...</option>
+                        <option value="Sovanah - 3325094407930003">Sovanah - 3325094407930003</option>
+                        <option value="Dariyanti - 3316094703840002">Dariyanti - 3316094703840002</option>
+                        <option value="Sunarti - 3316105402880003">Sunarti - 3316105402880003</option>
+                        <option value="Prihatiq Martha Kartika - 3316036103910002">Prihatiq Martha Kartika - 3316036103910002</option>
+                        <option value="Meva yulisna - 3603177112820007">Meva yulisna - 3603177112820007</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tanggal-wawancara">Tanggal Wawancara</label>
+                    <input type="date" id="tanggal-wawancara" name="tanggal" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Dokumentasi Foto Responden</label>
+                    <div id="responden-container">
+                        <!-- Responden akan ditambahkan di sini -->
+                    </div>
+                    <button type="button" id="add-responden" class="btn btn-secondary">
+                        <span>+</span> Tambah Responden
+                    </button>
+                </div>
+
+                <button type="submit" id="generate-pdf" class="btn btn-primary">
+                    <span>📄</span> <span id="btn-text">Buat dan Unduh PDF</span>
+                </button>
+
+                <div id="error-message" class="error-message"></div>
+            </form>
+        </main>
+    </div>
+
+    <script>
+        const LOKASI_DATA = { "Perangkat Sekolah": ["SMK MUHAMMADIYAH 1 BLORA - SONOREJO", "SMK AL IKHLAS BLORA - BERAN", "SMAS KATOLIK BLORA - KEDUNGJENAR", "MAS KHOZINATUL ULUM - MLANGSEN", "SMK AL MUHAMMAD CEPU - CEPU", "SMAS PGRI CEPU - CEPU", "SMA AT TAJDID - TAMBAKROMO", "SMAS MUHAMMADIYAH CEPU - BALUN", "SMK MUhammadiyah JATI - DOPLANG", "SMA NEGERI 1 JEPON - TEMPELLEMAHBANG", "SMK MUHAMMADIYAH 1 KEDUNGTUBAN - NGRAHO", "SMK NEGERI 1 KUNDURAN - KUNDURAN", "SMK PGRI KUNDURAN - SAMBIROTO", "SMK SULTAN AGUNG NGAWEN - NGAWEN", "SMA NEGERI 1 NGAWEN - TREMBULREJO", "SMK AL MUSTAWA - KUTUKAN", "SMK KATOLIK ST LOUIS RANDUBLATUNG - PILANG", "SMAS MUHAMMADIYAH TODANAN - TODANAN", "SMA ISLAM PLUS ALBANJARI - TUNJUNGAN", "MAN BLORA - TAMANREJO"], "Perangkat Desa": ["SONOREJO - BLORA", "BERAN - BLORA", "KEDUNGJENAR - BLORA", "MLANGSEN - BLORA", "CEPU - CEPU", "TAMBAKROMO - CEPU", "BALUN - CEPU", "DOPLANG - JATI", "TEMPELLEMAHBANG - JEPON", "NGRAHO - KEDUNGTUBAN", "KUNDURAN - KUNDURAN", "SAMBIROTO - KUNDURAN", "NGAWEN - NGAWEN", "TREMBULREJO - NGAWEN", "KUTUKAN - RANDUBLATUNG", "PILANG - RANDUBLATUNG", "TODANAN - TODANAN", "TUNJUNGAN - TUNJUNGAN", "TAMANREJO - TUNJUNGAN"], "Akademisi Kampus Eksisting": ["UNIVERSITAS TERBUKA", "POLITEKNIK KESEHATAN BLORA", "SEKOLAH TINGGI AGAMA ISLAM (STAIM) BLORA", "SEKOLAH TINGGI KEGURUAN DAN ILMU PENDIDIKAN (STKIP) MUHAMMADIYAH BLORA", "POLITEKNIK ENERGI DAN MINERAL AKAMIGAS (PEM AKAMIGAS)"], "UMKM / Jasa / Industri": ["UNIVERSITAS TERBUKA", "POLITEKNIK KESEHATAN BLORA", "SEKOLAH TINGGI AGAMA ISLAM (STAIM) BLORA", "SEKOLAH TINGGI KEGURUAN DAN ILMU PENDIDIKAN (STKIP) MUHAMMADIYAH BLORA", "POLITEKNIK ENERGI DAN MINERAL AKAMIGAS (PEM AKAMIGAS)", "Kec. Blora : Ds. Mlangseng, Sekitaran Pasar Sido Makmur dan Kantor Kecamatan Blora", "Kec. Cepu : Ds. Balun sekitaran Kantor PDAM Cepu", "Kec. Randublatung : Sekitar lokasi Kelurahan Wulung", "Kec. Kunduran : Sekitaran Desa Sambiroto"] };
+        let respondenCount = 0;
+
+        const respondenContainer = document.getElementById('responden-container');
+        const form = document.getElementById('wawancara-form');
+        const generateBtn = document.getElementById('generate-pdf');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const errorMessage = document.getElementById('error-message');
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+            setTimeout(() => errorMessage.classList.remove('show'), 5000);
+        }
+
+        function handleFileSelect(input) {
+            const wrapper = input.closest('.file-input-wrapper');
+            if (input.files[0]) {
+                wrapper.classList.add('has-file');
+                wrapper.querySelector('.file-name').textContent = input.files[0].name;
+            }
+        }
+
+        function updateLokasi(select) {
+            const card = select.closest('.responden-card');
+            const lokasiSelect = card.querySelector('.lokasi-select');
+            const kategori = select.value;
+            lokasiSelect.innerHTML = '<option value="">Pilih Lokasi/Instansi...</option>';
+            if (LOKASI_DATA[kategori]) {
+                LOKASI_DATA[kategori].forEach(lokasi => {
+                    const option = document.createElement('option');
+                    option.value = lokasi;
+                    option.textContent = lokasi;
+                    lokasiSelect.appendChild(option);
+                });
+            }
+        }
+
+        function addResponden() {
+            respondenCount++;
+            const id = respondenCount;
+            const respondenCard = document.createElement('div');
+            respondenCard.className = 'responden-card';
+            respondenCard.id = `responden-${id}`;
+            respondenCard.innerHTML = `
+                <div class="responden-header">
+                    <h3 class="responden-title">Responden ke-${id}</h3>
+                    ${id > 1 ? '<button type="button" class="remove-btn" onclick="removeResponden(this)">Hapus</button>' : ''}
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <select class="form-input kategori-select" name="kategori_${id}" onchange="updateLokasi(this)" required>
+                        <option value="">Pilih Kategori...</option>
+                        <option value="Perangkat Sekolah">Perangkat Sekolah</option>
+                        <option value="Perangkat Desa">Perangkat Desa</option>
+                        <option value="Akademisi Kampus Eksisting">Akademisi Kampus Eksisting</option>
+                        <option value="UMKM / Jasa / Industri">UMKM / Jasa / Industri</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Lokasi</label>
+                    <select class="form-input lokasi-select" name="lokasi_${id}" required>
+                        <option value="">Pilih kategori dahulu</option>
+                    </select>
+                </div>
+                <div class="file-upload">
+                    <label>Foto Sebelum</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" name="sebelum_${id}" accept="image/*" onchange="handleFileSelect(this)" required>
+                        <div class="file-info"><span>📷 Pilih foto</span><span class="file-name"></span></div>
+                    </div>
+                </div>
+                <div class="file-upload">
+                    <label>Foto Sesudah</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" name="sesudah_${id}" accept="image/*" onchange="handleFileSelect(this)" required>
+                        <div class="file-info"><span>📷 Pilih foto</span><span class="file-name"></span></div>
+                    </div>
+                </div>`;
+            respondenContainer.appendChild(respondenCard);
+        }
+
+        function removeResponden(btn) {
+            btn.closest('.responden-card').remove();
+            // Update nomor responden jika diperlukan (opsional, karena ID sudah unik)
+        }
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            generateBtn.disabled = true;
+            loadingText.textContent = 'Mengunggah & Memproses...';
+            loadingOverlay.classList.add('show');
+            errorMessage.classList.remove('show');
+
+            const formData = new FormData(form);
+
+            try {
+                const response = await fetch('/api/generate-pdf', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Gagal membuat PDF.');
+                }
+
+                // Mendapatkan nama file dari header
+                const disposition = response.headers.get('Content-Disposition');
+                let fileName = 'dokumentasi.pdf';
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                    const matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[1]) {
+                        fileName = matches[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                generateBtn.disabled = false;
+                loadingOverlay.classList.remove('show');
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('tanggal-wawancara').value = new Date().toISOString().split('T')[0];
+            addResponden();
+            document.getElementById('add-responden').addEventListener('click', addResponden);
+        });
+        
+        // Membuat fungsi global agar bisa diakses dari HTML
+        window.updateLokasi = updateLokasi;
+        window.removeResponden = removeResponden;
+        window.handleFileSelect = handleFileSelect;
+    </script>
+</body>
+</html>
