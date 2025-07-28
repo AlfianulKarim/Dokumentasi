@@ -21,7 +21,6 @@ const parseMultipartForm = (event) => {
 
         const bb = busboy({
             headers: event.headers,
-            // Perlu untuk Netlify/AWS Lambda, karena body sudah di-decode
             defParamCharset: 'utf8' 
         });
 
@@ -48,7 +47,6 @@ const parseMultipartForm = (event) => {
             console.error('Busboy error:', err);
         });
 
-        // Tulis body yang sudah di-decode ke busboy
         bb.write(Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8'));
         bb.end();
     });
@@ -56,14 +54,17 @@ const parseMultipartForm = (event) => {
 
 
 exports.handler = async (event) => {
+    console.log('Function generate-pdf invoked.');
+
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
     try {
+        console.log('Starting form parsing...');
         const { fields, files } = await parseMultipartForm(event);
+        console.log('Form parsing complete. Fields:', Object.keys(fields).length, 'Files:', Object.keys(files).length);
         
-        // 1. Mengelompokkan data responden
         const respondenData = {};
         for (const key in fields) {
             if (key.includes('_')) {
@@ -80,21 +81,19 @@ exports.handler = async (event) => {
             }
         }
         const allResponden = Object.values(respondenData);
+        console.log(`Grouped ${allResponden.length} respondents.`);
 
-        const F4 = [595.28, 935.43]; // Ukuran F4 dalam poin (210mm x 330mm)
+        const F4 = [595.28, 935.43];
         const doc = new PDFDocument({ size: F4, margin: 50 });
         const passThrough = new PassThrough();
         doc.pipe(passThrough);
+        console.log('PDF document initialized.');
 
         // Header
         doc.fontSize(14).font('Helvetica-Bold').text('DOKUMENTASI KEGIATAN WAWANCARA', { align: 'center' })
-            .moveDown(0.5)
-            .text('KAJIAN KELAYAKAN PENDIRIAN KAMPUS DAN PSDKU', { align: 'center' })
-            .moveDown(0.5)
-            .text('DI KABUPATEN BLORA', { align: 'center' })
-            .moveDown()
-            .moveTo(50, doc.y).lineTo(550, doc.y).stroke()
-            .moveDown();
+            .moveDown(0.5).text('KAJIAN KELAYAKAN PENDIRIAN KAMPUS DAN PSDKU', { align: 'center' })
+            .moveDown(0.5).text('DI KABUPATEN BLORA', { align: 'center' })
+            .moveDown().moveTo(50, doc.y).lineTo(550, doc.y).stroke().moveDown();
 
         // Info Enumerator
         const [nama, nik] = (fields.enumerator || ' - ').split(' - ');
@@ -103,45 +102,60 @@ exports.handler = async (event) => {
         doc.fontSize(10).font('Helvetica');
         const initialY = doc.y;
         const labelX = 50;
-        const valueX = 170; // Posisi X untuk nilai setelah titik dua
+        const valueX = 170;
 
         doc.text('Nama Enumerator', labelX, initialY);
         doc.text(`: ${nama}`, valueX, initialY);
-
         doc.text('NIK', labelX, initialY + 15);
         doc.text(`: ${nik}`, valueX, initialY + 15);
-
         doc.text('Tanggal Wawancara', labelX, initialY + 30);
         doc.text(`: ${tanggal}`, valueX, initialY + 30);
 
         doc.y = initialY + 45; 
         doc.moveDown(2);
-
+        console.log('Header and enumerator info added.');
 
         // 3. Menambahkan data setiap responden ke PDF
         for (let i = 0; i < allResponden.length; i++) {
             const data = allResponden[i];
+            console.log(`--- Processing respondent #${i + 1} ---`);
             
-            // PERBAIKAN: Hitung estimasi tinggi secara dinamis
             const photoWidth = 230;
-            let maxHeight = 180; // Tinggi default jika tidak ada gambar
-            
+            let maxHeight = 180;
             let imgSebelumBuffer, imgSesudahBuffer;
-            if (data.sebelum && data.sebelum.content.length > 0) {
-                 imgSebelumBuffer = await sharp(data.sebelum.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
-                 const metadata = await sharp(imgSebelumBuffer).metadata();
-                 const scaledHeight = (metadata.height / metadata.width) * photoWidth;
-                 if (scaledHeight > maxHeight) maxHeight = scaledHeight;
+
+            // Proses gambar 'sebelum'
+            if (data.sebelum && data.sebelum.content && data.sebelum.content.length > 0) {
+                 try {
+                    console.log(`Responden #${i + 1}: Processing 'sebelum' image (${(data.sebelum.content.length / 1024).toFixed(1)} KB)`);
+                    imgSebelumBuffer = await sharp(data.sebelum.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
+                    const metadata = await sharp(imgSebelumBuffer).metadata();
+                    const scaledHeight = (metadata.height / metadata.width) * photoWidth;
+                    if (scaledHeight > maxHeight) maxHeight = scaledHeight;
+                    console.log(`Responden #${i + 1}: 'sebelum' image processed.`);
+                 } catch(e){ console.error(`Responden #${i + 1}: Error processing 'sebelum' image:`, e); }
+            } else {
+                 console.log(`Responden #${i + 1}: No 'sebelum' image found.`);
             }
-            if (data.sesudah && data.sesudah.content.length > 0) {
-                 imgSesudahBuffer = await sharp(data.sesudah.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
-                 const metadata = await sharp(imgSesudahBuffer).metadata();
-                 const scaledHeight = (metadata.height / metadata.width) * photoWidth;
-                 if (scaledHeight > maxHeight) maxHeight = scaledHeight;
+
+            // Proses gambar 'sesudah'
+            if (data.sesudah && data.sesudah.content && data.sesudah.content.length > 0) {
+                 try {
+                    console.log(`Responden #${i + 1}: Processing 'sesudah' image (${(data.sesudah.content.length / 1024).toFixed(1)} KB)`);
+                    imgSesudahBuffer = await sharp(data.sesudah.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
+                    const metadata = await sharp(imgSesudahBuffer).metadata();
+                    const scaledHeight = (metadata.height / metadata.width) * photoWidth;
+                    if (scaledHeight > maxHeight) maxHeight = scaledHeight;
+                    console.log(`Responden #${i + 1}: 'sesudah' image processed.`);
+                 } catch(e){ console.error(`Responden #${i + 1}: Error processing 'sesudah' image:`, e); }
+            } else {
+                console.log(`Responden #${i + 1}: No 'sesudah' image found.`);
             }
             
-            const sectionHeight = maxHeight + 90; // Tinggi gambar + teks + margin
+            const sectionHeight = maxHeight + 90;
+            console.log(`Responden #${i + 1}: Calculated max height = ${maxHeight.toFixed(1)}, section height = ${sectionHeight.toFixed(1)}`);
             if (doc.y + sectionHeight > doc.page.height - 50) { 
+                console.log(`Responden #${i + 1}: Not enough space, adding new page.`);
                 doc.addPage();
             }
 
@@ -156,37 +170,35 @@ exports.handler = async (event) => {
 
             const photoY = doc.y;
              
-            // Gambar 'sebelum'
             if (imgSebelumBuffer) {
                 try {
                     doc.image(imgSebelumBuffer, 50, photoY, { width: photoWidth });
                 } catch (e) {
-                     doc.font('Helvetica').text('Gagal memproses gambar sebelum.', 50, photoY);
+                     console.error(`Responden #${i + 1}: Error adding 'sebelum' image to PDF:`, e);
+                     doc.font('Helvetica').text('Gagal memuat gambar sebelum.', 50, photoY);
                 }
             }
-
-            // Gambar 'sesudah'
             if (imgSesudahBuffer) {
                  try {
                     doc.image(imgSesudahBuffer, 320, photoY, { width: photoWidth });
                 } catch (e) {
-                     doc.font('Helvetica').text('Gagal memproses gambar sesudah.', 320, photoY);
+                     console.error(`Responden #${i + 1}: Error adding 'sesudah' image to PDF:`, e);
+                     doc.font('Helvetica').text('Gagal memuat gambar sesudah.', 320, photoY);
                 }
             }
             
-            // Pindahkan posisi teks keterangan ke bawah kotak foto
             const captionY = photoY + maxHeight + 5;
             doc.font('Helvetica-Bold').fontSize(8);
             doc.text('FOTO SEBELUM WAWANCARA', 50, captionY, { width: photoWidth, align: 'center' });
             doc.text('FOTO SESUDAH WAWANCARA', 320, captionY, { width: photoWidth, align: 'center' });
             
-            // Pindahkan cursor ke bawah blok foto dan keterangannya
             doc.y = captionY + 20;
+            console.log(`--- Finished respondent #${i + 1} ---`);
         }
 
+        console.log('Finalizing PDF and sending response...');
         doc.end();
         
-        // 4. Mengirim PDF kembali ke browser
         const pdfBuffer = await streamToBuffer(passThrough);
         const fileName = `Dokumentasi Wawancara - ${nama}.pdf`;
 
@@ -201,9 +213,12 @@ exports.handler = async (event) => {
         };
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('!!!--- FATAL SERVER ERROR ---!!!');
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
         return {
             statusCode: 500,
-            body: JSON.stringify({ message: `Terjadi kesalahan di server: ${error.message}` }),
+            body: JSON.stringify({ message: `Terjadi kesalahan fatal di server: ${error.message}` }),
         };
     }
+};
