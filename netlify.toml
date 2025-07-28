@@ -4,6 +4,12 @@
   # Folder tempat Netlify Functions Anda berada
   functions = "netlify/functions"
 
+[functions]
+  # Meningkatkan timeout default dari 10 detik menjadi 25 detik
+  # untuk memberi waktu lebih pada pemrosesan gambar yang berat.
+  # Catatan: Akun gratis Netlify memiliki batas maksimum.
+  timeout = 25
+
 [[redirects]]
   # Mengarahkan permintaan dari root ke Netlify Function kita
   from = "/api/generate-pdf"
