@@ -117,19 +117,18 @@ exports.handler = async (event) => {
 
         // 3. Menambahkan data setiap responden ke PDF
         for (let i = 0; i < allResponden.length; i++) {
-            const data = allResponden[i];
+            let data = allResponden[i];
             console.log(`--- Processing respondent #${i + 1} ---`);
             
             const photoWidth = 230;
             let maxHeight = 180;
             let imgSebelumBuffer, imgSesudahBuffer;
 
-            // Proses gambar 'sebelum' dan lepaskan memori mentah
+            // Proses gambar 'sebelum'
             if (data.sebelum && data.sebelum.content && data.sebelum.content.length > 0) {
                  try {
                     console.log(`Responden #${i + 1}: Processing 'sebelum' image (${(data.sebelum.content.length / 1024).toFixed(1)} KB)`);
-                    imgSebelumBuffer = await sharp(data.sebelum.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
-                    data.sebelum.content = null; // PERBAIKAN: Lepaskan memori
+                    imgSebelumBuffer = await sharp(data.sebelum.content).resize({ width: 600 }).jpeg({ quality: 80 }).toBuffer(); // Mengurangi resolusi
                     const metadata = await sharp(imgSebelumBuffer).metadata();
                     const scaledHeight = (metadata.height / metadata.width) * photoWidth;
                     if (scaledHeight > maxHeight) maxHeight = scaledHeight;
@@ -139,12 +138,11 @@ exports.handler = async (event) => {
                  console.log(`Responden #${i + 1}: No 'sebelum' image found.`);
             }
 
-            // Proses gambar 'sesudah' dan lepaskan memori mentah
+            // Proses gambar 'sesudah'
             if (data.sesudah && data.sesudah.content && data.sesudah.content.length > 0) {
                  try {
                     console.log(`Responden #${i + 1}: Processing 'sesudah' image (${(data.sesudah.content.length / 1024).toFixed(1)} KB)`);
-                    imgSesudahBuffer = await sharp(data.sesudah.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
-                    data.sesudah.content = null; // PERBAIKAN: Lepaskan memori
+                    imgSesudahBuffer = await sharp(data.sesudah.content).resize({ width: 600 }).jpeg({ quality: 80 }).toBuffer(); // Mengurangi resolusi
                     const metadata = await sharp(imgSesudahBuffer).metadata();
                     const scaledHeight = (metadata.height / metadata.width) * photoWidth;
                     if (scaledHeight > maxHeight) maxHeight = scaledHeight;
@@ -154,6 +152,10 @@ exports.handler = async (event) => {
                 console.log(`Responden #${i + 1}: No 'sesudah' image found.`);
             }
             
+            // Hapus referensi ke buffer mentah secepat mungkin
+            if (data.sebelum) data.sebelum.content = null;
+            if (data.sesudah) data.sesudah.content = null;
+
             const sectionHeight = maxHeight + 90;
             console.log(`Responden #${i + 1}: Calculated max height = ${maxHeight.toFixed(1)}, section height = ${sectionHeight.toFixed(1)}`);
             if (doc.y + sectionHeight > doc.page.height - 50) { 
@@ -195,6 +197,14 @@ exports.handler = async (event) => {
             doc.text('FOTO SESUDAH WAWANCARA', 320, captionY, { width: photoWidth, align: 'center' });
             
             doc.y = captionY + 20;
+
+            // PERBAIKAN: Memaksa garbage collection
+            if (global.gc) {
+                console.log(`Responden #${i+1}: Triggering garbage collection.`);
+                global.gc();
+            } else {
+                console.log(`Responden #${i+1}: Garbage collection not exposed.`);
+            }
             console.log(`--- Finished respondent #${i + 1} ---`);
         }
 
