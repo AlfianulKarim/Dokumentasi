@@ -1,0 +1,16 @@
+{
+  "name": "pdf-generator-serverless",
+  "version": "1.0.0",
+  "description": "Serverless PDF generator with Netlify Functions",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "busboy": "^1.6.0",
+    "pdfkit": "^0.15.0",
+    "sharp": "^0.33.4"
+  }
+}
