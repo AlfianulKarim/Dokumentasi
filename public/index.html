@@ -108,7 +108,7 @@
         function showError(message) {
             errorMessage.textContent = message;
             errorMessage.classList.add('show');
-            setTimeout(() => errorMessage.classList.remove('show'), 5000);
+            setTimeout(() => errorMessage.classList.remove('show'), 8000); // Waktu lebih lama
         }
 
         function handleFileSelect(input) {
@@ -198,9 +198,18 @@
                     body: formData,
                 });
 
+                // PERBAIKAN: Penanganan error yang lebih baik
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Gagal membuat PDF.');
+                    let errorMsg = `Gagal membuat PDF. Status: ${response.status}`;
+                    try {
+                        // Coba parse error sebagai JSON
+                        const errorData = await response.json();
+                        errorMsg = errorData.message || JSON.stringify(errorData);
+                    } catch (jsonError) {
+                        // Jika gagal, baca sebagai teks biasa (mungkin halaman error HTML)
+                        errorMsg = await response.text();
+                    }
+                    throw new Error(errorMsg);
                 }
 
                 // Mendapatkan nama file dari header
@@ -226,7 +235,9 @@
                 a.remove();
 
             } catch (error) {
-                showError(error.message);
+                // Tampilkan pesan error yang lebih informatif
+                showError(`Terjadi kesalahan: ${error.message}`);
+                console.error("Detail Error:", error);
             } finally {
                 generateBtn.disabled = false;
                 loadingOverlay.classList.remove('show');
