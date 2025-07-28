@@ -124,11 +124,12 @@ exports.handler = async (event) => {
             let maxHeight = 180;
             let imgSebelumBuffer, imgSesudahBuffer;
 
-            // Proses gambar 'sebelum'
+            // Proses gambar 'sebelum' dan lepaskan memori mentah
             if (data.sebelum && data.sebelum.content && data.sebelum.content.length > 0) {
                  try {
                     console.log(`Responden #${i + 1}: Processing 'sebelum' image (${(data.sebelum.content.length / 1024).toFixed(1)} KB)`);
                     imgSebelumBuffer = await sharp(data.sebelum.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
+                    data.sebelum.content = null; // PERBAIKAN: Lepaskan memori
                     const metadata = await sharp(imgSebelumBuffer).metadata();
                     const scaledHeight = (metadata.height / metadata.width) * photoWidth;
                     if (scaledHeight > maxHeight) maxHeight = scaledHeight;
@@ -138,11 +139,12 @@ exports.handler = async (event) => {
                  console.log(`Responden #${i + 1}: No 'sebelum' image found.`);
             }
 
-            // Proses gambar 'sesudah'
+            // Proses gambar 'sesudah' dan lepaskan memori mentah
             if (data.sesudah && data.sesudah.content && data.sesudah.content.length > 0) {
                  try {
                     console.log(`Responden #${i + 1}: Processing 'sesudah' image (${(data.sesudah.content.length / 1024).toFixed(1)} KB)`);
                     imgSesudahBuffer = await sharp(data.sesudah.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
+                    data.sesudah.content = null; // PERBAIKAN: Lepaskan memori
                     const metadata = await sharp(imgSesudahBuffer).metadata();
                     const scaledHeight = (metadata.height / metadata.width) * photoWidth;
                     if (scaledHeight > maxHeight) maxHeight = scaledHeight;
