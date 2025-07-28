@@ -1,17 +1,12 @@
 [build]
-  # Folder tempat file frontend Anda berada
-  publish = "public"
-  # Folder tempat Netlify Functions Anda berada
-  functions = "netlify/functions"
+  command = "npm run build"
+  publish = "dist" # atau "public", tergantung output folder Anda
 
-[functions]
-  # Meningkatkan timeout default dari 10 detik menjadi 25 detik
-  # untuk memberi waktu lebih pada pemrosesan gambar yang berat.
-  # Catatan: Akun gratis Netlify memiliki batas maksimum.
-  timeout = 25
+[dev]
+  command = "npm run dev"
+  port = 8888
 
 [[redirects]]
-  # Mengarahkan permintaan dari root ke Netlify Function kita
-  from = "/api/generate-pdf"
-  to = "/.netlify/functions/generate-pdf"
+  from = "/*"
+  to = "/index.html"
   status = 200
