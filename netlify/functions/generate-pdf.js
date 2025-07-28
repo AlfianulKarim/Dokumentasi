@@ -17,13 +17,13 @@ const streamToBuffer = (stream) => {
     });
 };
 
-// --- PERBAIKAN: Fungsi parsing yang lebih efisien memori ---
-// Fungsi ini memproses gambar saat diterima, bukan menampung semuanya.
+// --- PERBAIKAN: Fungsi parsing yang lebih efisien memori & lebih cepat ---
 const parseAndProcessForm = (event) => {
     return new Promise((resolve, reject) => {
         const fields = {};
         const files = {};
         const fileProcessingPromises = [];
+        const functionStartTime = Date.now();
 
         const bb = busboy({
             headers: event.headers,
@@ -33,36 +33,32 @@ const parseAndProcessForm = (event) => {
         bb.on('file', (name, stream, info) => {
             const processPromise = async () => {
                 try {
-                    console.log(`Receiving file stream for: ${name}`);
-                    // 1. Baca stream file mentah ke buffer
+                    const fileStartTime = Date.now();
+                    console.log(`[T+${(fileStartTime - functionStartTime) / 1000}s] Receiving file stream: ${name}`);
                     const rawBuffer = await streamToBuffer(stream);
-                    console.log(`File ${name} buffered, size: ${(rawBuffer.length / 1024).toFixed(1)} KB.`);
 
-                    // 2. Langsung proses dengan sharp untuk memperkecil ukuran
+                    // --- OPTIMISASI UNTUK KECEPATAN ---
                     const processedBuffer = await sharp(rawBuffer)
                         .resize({
-                            width: 800, // Menjaga resolusi tetap baik tapi tidak terlalu besar
+                            width: 720, // Mengurangi resolusi untuk proses lebih cepat
                             fit: 'inside',
                             withoutEnlargement: true
                         })
                         .jpeg({
-                            quality: 85,
+                            quality: 80, // Mengurangi kualitas sedikit untuk file lebih kecil & cepat
                             progressive: true
                         })
                         .toBuffer();
 
-                    // 3. Simpan HANYA buffer yang sudah diproses (jauh lebih kecil)
                     files[name] = {
                         filename: info.filename,
-                        mimeType: 'image/jpeg', // Output selalu jpeg
+                        mimeType: 'image/jpeg',
                         content: processedBuffer,
                     };
-                    console.log(`File ${name} processed and stored, new size: ${(processedBuffer.length / 1024).toFixed(1)} KB.`);
-                    // Buffer mentah (rawBuffer) sekarang akan otomatis dibersihkan oleh garbage collector
+                    const fileEndTime = Date.now();
+                    console.log(`[T+${(fileEndTime - functionStartTime) / 1000}s] File ${name} processed in ${(fileEndTime - fileStartTime)}ms. Size: ${(rawBuffer.length / 1024).toFixed(1)}KB -> ${(processedBuffer.length / 1024).toFixed(1)}KB`);
                 } catch (err) {
                     console.error(`Error processing file ${name}:`, err);
-                    // Jika terjadi error, kita bisa memutuskan untuk mengabaikan file ini
-                    // atau menghentikan seluruh proses dengan `reject(err)`.
                 }
             };
             fileProcessingPromises.push(processPromise());
@@ -74,9 +70,8 @@ const parseAndProcessForm = (event) => {
 
         bb.on('close', async () => {
             try {
-                // Tunggu semua pemrosesan file selesai
                 await Promise.all(fileProcessingPromises);
-                console.log('All file streams processed.');
+                console.log(`[T+${(Date.now() - functionStartTime) / 1000}s] All file streams processed.`);
                 resolve({
                     fields,
                     files
@@ -98,7 +93,8 @@ const parseAndProcessForm = (event) => {
 
 
 exports.handler = async (event) => {
-    console.log('Function generate-pdf invoked.');
+    const handlerStartTime = Date.now();
+    console.log(`[T+0s] Function generate-pdf invoked.`);
 
     if (event.httpMethod !== 'POST') {
         return {
@@ -108,12 +104,11 @@ exports.handler = async (event) => {
     }
 
     try {
-        // Gunakan fungsi parsing yang baru dan lebih efisien
         const {
             fields,
             files
         } = await parseAndProcessForm(event);
-        console.log('Form parsing and processing complete. Fields:', Object.keys(fields).length, 'Files:', Object.keys(files).length);
+        console.log(`[T+${(Date.now() - handlerStartTime) / 1000}s] Form parsing and processing complete.`);
 
         const respondenData = {};
         for (const key in fields) {
@@ -127,17 +122,17 @@ exports.handler = async (event) => {
             if (key.includes('_')) {
                 const [type, id] = key.split('_');
                 if (!respondenData[id]) respondenData[id] = {};
-                // 'content' di sini sudah merupakan buffer yang diproses
                 respondenData[id][type] = files[key].content;
             }
         }
         const allResponden = Object.values(respondenData);
-        console.log(`Grouped ${allResponden.length} respondents.`);
+        console.log(`[T+${(Date.now() - handlerStartTime) / 1000}s] Grouped ${allResponden.length} respondents.`);
 
         const F4 = [595.28, 935.43];
         const doc = new PDFDocument({
             size: F4,
-            margin: 50
+            margin: 50,
+            bufferPages: true // Penting untuk performa dengan banyak halaman
         });
         const passThrough = new PassThrough();
         doc.pipe(passThrough);
@@ -172,16 +167,16 @@ exports.handler = async (event) => {
         doc.text(`: ${tanggal}`, valueX, currentY);
         doc.y = currentY + 15;
         doc.moveDown(2);
+        console.log(`[T+${(Date.now() - handlerStartTime) / 1000}s] PDF Header created.`);
 
         // Menambahkan data setiap responden ke PDF
         for (let i = 0; i < allResponden.length; i++) {
             const data = allResponden[i];
             const photoWidth = 230;
-            let maxHeight = 180; // Tinggi default jika tidak ada gambar
+            let maxHeight = 180;
             let imgSebelumBuffer = data.sebelum;
             let imgSesudahBuffer = data.sesudah;
 
-            // Hitung tinggi maksimum dari gambar yang ada
             if (imgSebelumBuffer) {
                 const metadata = await sharp(imgSebelumBuffer).metadata();
                 const scaledHeight = (metadata.height / metadata.width) * photoWidth;
@@ -193,12 +188,12 @@ exports.handler = async (event) => {
                 if (scaledHeight > maxHeight) maxHeight = scaledHeight;
             }
 
-            const sectionHeight = maxHeight + 90; // Perkiraan tinggi total section
+            const sectionHeight = maxHeight + 90;
             if (doc.y + sectionHeight > doc.page.height - 50) {
+                console.log(`Adding new page for respondent ${i + 1}`);
                 doc.addPage();
             }
 
-            // Garis pemisah dan info responden
             doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke().moveDown();
             doc.fontSize(12).font('Helvetica-Bold').text(`RESPONDEN KE-${i + 1}`, {
                 underline: true
@@ -233,14 +228,15 @@ exports.handler = async (event) => {
                 width: photoWidth,
                 align: 'center'
             });
-
             doc.y = captionY + 20;
+            console.log(`[T+${(Date.now() - handlerStartTime) / 1000}s] Respondent ${i + 1} added to PDF.`);
         }
 
         doc.end();
 
         const pdfBuffer = await streamToBuffer(passThrough);
         const fileName = `Dokumentasi Wawancara - ${nama}.pdf`;
+        console.log(`[T+${(Date.now() - handlerStartTime) / 1000}s] PDF generated, size: ${(pdfBuffer.length / 1024).toFixed(1)}KB. Sending response.`);
 
         return {
             statusCode: 200,
