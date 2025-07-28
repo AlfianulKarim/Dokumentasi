@@ -1,0 +1,11 @@
+[build]
+  # Folder tempat file frontend Anda berada
+  publish = "public"
+  # Folder tempat Netlify Functions Anda berada
+  functions = "netlify/functions"
+
+[[redirects]]
+  # Mengarahkan permintaan dari root ke Netlify Function kita
+  from = "/api/generate-pdf"
+  to = "/.netlify/functions/generate-pdf"
+  status = 200
