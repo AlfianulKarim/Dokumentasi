@@ -37,15 +37,15 @@ const parseAndProcessForm = (event) => {
                     console.log(`[T+${(fileStartTime - functionStartTime) / 1000}s] Receiving file stream: ${name}`);
                     const rawBuffer = await streamToBuffer(stream);
 
-                    // --- OPTIMISASI UNTUK KECEPATAN ---
+                    // --- OPTIMISASI AGGRESIF UNTUK KECEPATAN ---
                     const processedBuffer = await sharp(rawBuffer)
                         .resize({
-                            width: 720, // Mengurangi resolusi untuk proses lebih cepat
+                            width: 640, // Resolusi lebih rendah untuk proses lebih cepat
                             fit: 'inside',
                             withoutEnlargement: true
                         })
                         .jpeg({
-                            quality: 80, // Mengurangi kualitas sedikit untuk file lebih kecil & cepat
+                            quality: 75, // Kualitas lebih rendah untuk file lebih kecil & cepat
                             progressive: true
                         })
                         .toBuffer();
@@ -188,7 +188,7 @@ exports.handler = async (event) => {
                 if (scaledHeight > maxHeight) maxHeight = scaledHeight;
             }
 
-            const sectionHeight = maxHeight + 90;
+            const sectionHeight = maxHeight + 110; // Menambah ruang untuk info responden
             if (doc.y + sectionHeight > doc.page.height - 50) {
                 console.log(`Adding new page for respondent ${i + 1}`);
                 doc.addPage();
@@ -198,9 +198,31 @@ exports.handler = async (event) => {
             doc.fontSize(12).font('Helvetica-Bold').text(`RESPONDEN KE-${i + 1}`, {
                 underline: true
             });
+
+            // --- PERBAIKAN TATA LETAK ---
+            let respondenInfoY = doc.y + 5;
             doc.fontSize(9).font('Helvetica');
-            doc.text(`Kategori: ${data.kategori || 'N/A'}`);
-            doc.text(`Lokasi: ${data.lokasi || 'N/A'}`).moveDown();
+
+            // Kategori
+            doc.text('Kategori', labelX, respondenInfoY);
+            doc.text(`: ${data.kategori || 'N/A'}`, valueX, respondenInfoY);
+            respondenInfoY += 15;
+
+            // Lokasi
+            doc.text('Lokasi', labelX, respondenInfoY);
+            const lokasiText = `: ${data.lokasi || 'N/A'}`;
+            // Bungkus teks jika terlalu panjang
+            doc.text(lokasiText, valueX, respondenInfoY, {
+                width: 550 - valueX // Batasi lebar teks di kolom nilai
+            });
+
+            // Hitung tinggi aktual dari teks lokasi yang mungkin lebih dari 1 baris
+            const lokasiTextHeight = doc.heightOfString(lokasiText, {
+                width: 550 - valueX
+            });
+            doc.y = respondenInfoY + lokasiTextHeight; // Atur posisi Y setelah teks lokasi
+            doc.moveDown();
+
 
             const photoY = doc.y;
             if (imgSebelumBuffer) {
