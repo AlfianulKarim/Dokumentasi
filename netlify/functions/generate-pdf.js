@@ -81,7 +81,6 @@ exports.handler = async (event) => {
         }
         const allResponden = Object.values(respondenData);
 
-        // PERUBAHAN 1: Ganti ukuran kertas ke F4
         const F4 = [595.28, 935.43]; // Ukuran F4 dalam poin (210mm x 330mm)
         const doc = new PDFDocument({ size: F4, margin: 50 });
         const passThrough = new PassThrough();
@@ -101,7 +100,6 @@ exports.handler = async (event) => {
         const [nama, nik] = (fields.enumerator || ' - ').split(' - ');
         const tanggal = new Date(fields.tanggal + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         
-        // PERUBAHAN 2: Layout untuk meratakan tanda titik dua (:)
         doc.fontSize(10).font('Helvetica');
         const initialY = doc.y;
         const labelX = 50;
@@ -116,7 +114,7 @@ exports.handler = async (event) => {
         doc.text('Tanggal Wawancara', labelX, initialY + 30);
         doc.text(`: ${tanggal}`, valueX, initialY + 30);
 
-        doc.y = initialY + 45; // Set posisi Y setelah blok info
+        doc.y = initialY + 45; 
         doc.moveDown(2);
 
 
@@ -124,8 +122,26 @@ exports.handler = async (event) => {
         for (let i = 0; i < allResponden.length; i++) {
             const data = allResponden[i];
             
-            // Estimasi tinggi section: foto (180) + teks (70) = 250pt
-            if (doc.y + 250 > doc.page.height - 50) { 
+            // PERBAIKAN: Hitung estimasi tinggi secara dinamis
+            const photoWidth = 230;
+            let maxHeight = 180; // Tinggi default jika tidak ada gambar
+            
+            let imgSebelumBuffer, imgSesudahBuffer;
+            if (data.sebelum && data.sebelum.content.length > 0) {
+                 imgSebelumBuffer = await sharp(data.sebelum.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
+                 const metadata = await sharp(imgSebelumBuffer).metadata();
+                 const scaledHeight = (metadata.height / metadata.width) * photoWidth;
+                 if (scaledHeight > maxHeight) maxHeight = scaledHeight;
+            }
+            if (data.sesudah && data.sesudah.content.length > 0) {
+                 imgSesudahBuffer = await sharp(data.sesudah.content).resize({ width: 800 }).jpeg({ quality: 80 }).toBuffer();
+                 const metadata = await sharp(imgSesudahBuffer).metadata();
+                 const scaledHeight = (metadata.height / metadata.width) * photoWidth;
+                 if (scaledHeight > maxHeight) maxHeight = scaledHeight;
+            }
+            
+            const sectionHeight = maxHeight + 90; // Tinggi gambar + teks + margin
+            if (doc.y + sectionHeight > doc.page.height - 50) { 
                 doc.addPage();
             }
 
@@ -139,42 +155,27 @@ exports.handler = async (event) => {
             doc.text(`Lokasi: ${data.lokasi || 'N/A'}`).moveDown();
 
             const photoY = doc.y;
-            const photoWidth = 230;
-            // PERUBAHAN 3: Tetapkan tinggi kotak foto agar konsisten
-            const photoHeight = 160; 
-
-            // Proses dan tambahkan gambar 'sebelum'
-            if (data.sebelum && data.sebelum.content.length > 0) {
+             
+            // Gambar 'sebelum'
+            if (imgSebelumBuffer) {
                 try {
-                    const processedImage = await sharp(data.sebelum.content)
-                        .resize({ width: 800 })
-                        .jpeg({ quality: 80 })
-                        .toBuffer();
-                    // Gunakan fit untuk memastikan gambar pas di dalam kotak tanpa distorsi
-                    doc.image(processedImage, 50, photoY, { fit: [photoWidth, photoHeight], align: 'center', valign: 'center' });
-                    // Gambar kotak pembatas untuk debugging (opsional)
-                    // doc.rect(50, photoY, photoWidth, photoHeight).stroke();
+                    doc.image(imgSebelumBuffer, 50, photoY, { width: photoWidth });
                 } catch (e) {
                      doc.font('Helvetica').text('Gagal memproses gambar sebelum.', 50, photoY);
                 }
             }
 
-            // Proses dan tambahkan gambar 'sesudah'
-            if (data.sesudah && data.sesudah.content.length > 0) {
+            // Gambar 'sesudah'
+            if (imgSesudahBuffer) {
                  try {
-                    const processedImage = await sharp(data.sesudah.content)
-                        .resize({ width: 800 })
-                        .jpeg({ quality: 80 })
-                        .toBuffer();
-                    doc.image(processedImage, 320, photoY, { fit: [photoWidth, photoHeight], align: 'center', valign: 'center' });
-                    // doc.rect(320, photoY, photoWidth, photoHeight).stroke();
+                    doc.image(imgSesudahBuffer, 320, photoY, { width: photoWidth });
                 } catch (e) {
                      doc.font('Helvetica').text('Gagal memproses gambar sesudah.', 320, photoY);
                 }
             }
             
-            // PERUBAHAN 3: Pindahkan posisi teks keterangan ke bawah kotak foto
-            const captionY = photoY + photoHeight + 5;
+            // Pindahkan posisi teks keterangan ke bawah kotak foto
+            const captionY = photoY + maxHeight + 5;
             doc.font('Helvetica-Bold').fontSize(8);
             doc.text('FOTO SEBELUM WAWANCARA', 50, captionY, { width: photoWidth, align: 'center' });
             doc.text('FOTO SESUDAH WAWANCARA', 320, captionY, { width: photoWidth, align: 'center' });
@@ -206,4 +207,3 @@ exports.handler = async (event) => {
             body: JSON.stringify({ message: `Terjadi kesalahan di server: ${error.message}` }),
         };
     }
-};
